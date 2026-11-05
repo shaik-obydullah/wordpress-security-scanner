@@ -1,0 +1,187 @@
+"""Security Report Template
+
+Renders a single scan summary into a self-contained HTML document.
+"""
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ summary.target }} - Security Report</title>
+<style>
+  :root {
+    --critical: #d32f2f;
+    --high: #f44336;
+    --medium: #ff9800;
+    --low: #ffc107;
+    --info: #2196f3;
+    --pass: #4caf50;
+    --bg: #fafafa;
+    --card: #ffffff;
+    --text: #212121;
+    --muted: #757575;
+    --border: #e0e0e0;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+  }
+  header.hero {
+    background: linear-gradient(135deg, #141e30, #243b55);
+    color: #fff;
+    padding: 40px 24px;
+  }
+  header.hero h1 { margin: 0 0 6px; font-size: 1.8rem; }
+  header.hero p { margin: 2px 0; color: #b0bec5; }
+  .container { max-width: 960px; margin: 0 auto; padding: 24px; }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 20px;
+  }
+  .card h2 { margin-top: 0; font-size: 1.3rem; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+  .stat {
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px;
+    text-align: center;
+  }
+  .stat .num { font-size: 2rem; font-weight: 700; }
+  .stat .lbl { color: var(--muted); font-size: 0.85rem; text-transform: uppercase; letter-spacing: .04em; }
+  .sev-critical { color: var(--critical); }
+  .sev-high { color: var(--high); }
+  .sev-medium { color: var(--medium); }
+  .sev-low { color: var(--low); }
+  .sev-info { color: var(--info); }
+  .sev-pass { color: var(--pass); }
+  .score-bar { background: #eee; border-radius: 6px; height: 14px; overflow: hidden; }
+  .score-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--pass), var(--low), var(--medium), var(--high), var(--critical));
+  }
+  table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+  th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { background: #f5f5f5; font-size: 0.85rem; text-transform: uppercase; letter-spacing: .03em; }
+  tr:hover { background: #fafafa; }
+  .badge {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 12px;
+    color: #fff;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+  .badge.critical { background: var(--critical); }
+  .badge.high { background: var(--high); }
+  .badge.medium { background: var(--medium); }
+  .badge.low { background: var(--low); color: #333; }
+  .badge.info { background: var(--info); }
+  .badge.pass { background: var(--pass); }
+  .evidence {
+    background: #f5f5f5;
+    border-left: 3px solid var(--border);
+    padding: 8px 12px;
+    font-family: SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace;
+    font-size: 0.85rem;
+    word-break: break-word;
+  }
+  .remediation {
+    background: #e8f5e9;
+    border-left: 3px solid var(--pass);
+    padding: 8px 12px;
+    font-size: 0.9rem;
+  }
+  footer { text-align: center; color: var(--muted); padding: 24px; font-size: 0.85rem; }
+  @media print {
+    body { background: #fff; }
+    .card { break-inside: avoid; border: 1px solid #ccc; }
+  }
+</style>
+</head>
+<body>
+<header class="hero">
+  <h1>WordPress Security Scan Report</h1>
+  <p>Target: {{ summary.target }}</p>
+  <p>Scan time: {{ summary.timestamp }}</p>
+  <p>Duration: {{ summary.duration }} seconds &middot; Profile: {{ summary.meta.profile }}</p>
+</header>
+
+<div class="container">
+  <div class="card">
+    <h2>Executive Summary</h2>
+    <p>
+      A security scan of <strong>{{ summary.target }}</strong> completed with
+      <strong>{{ summary.results|length }}</strong> findings. The overall risk score is
+      <strong>{{ summary.score }}</strong> / 100.
+    </p>
+    <div class="score-bar"><div class="score-fill" style="width: {{ summary.score }}%"></div></div>
+  </div>
+
+  <div class="card">
+    <h2>Findings by Severity</h2>
+    <div class="grid">
+      {% for severity in ['Critical', 'High', 'Medium', 'Low', 'Info', 'Pass'] %}
+      <div class="stat">
+        <div class="num sev-{{ severity|lower }}">{{ counts[severity] }}</div>
+        <div class="lbl">{{ severity }}</div>
+      </div>
+      {% endfor %}
+    </div>
+    <div style="margin-top: 12px; text-align: center;">
+      <img src="data:image/png;base64,{{ chart }}" alt="Severity distribution"
+           style="max-width: 100%;">
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Detailed Findings</h2>
+    {% if summary.results %}
+    <table>
+      <thead>
+        <tr><th>Severity</th><th>Category</th><th>Finding</th><th>Evidence</th><th>Remediation</th></tr>
+      </thead>
+      <tbody>
+        {% for r in summary.results %}
+        <tr>
+          <td><span class="badge {{ r.severity|lower }}">{{ r.severity }}</span></td>
+          <td>{{ r.category }}</td>
+          <td>
+            <strong>{{ r.title }}</strong>
+            {% if r.description %}<br><small>{{ r.description }}</small>{% endif %}
+          </td>
+          <td>
+            {% if r.evidence %}<div class="evidence">{{ r.evidence }}</div>{% endif %}
+          </td>
+          <td>{% if r.remediation %}<div class="remediation">{{ r.remediation }}</div>{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+      <p>No findings recorded.</p>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <h2>Legal Notice</h2>
+    <p>
+      This report was generated for <strong>educational and defensive purposes</strong>.
+      Only scan WordPress sites you own or have explicit written permission to test.
+      Unauthorized scanning is illegal under computer fraud laws.
+    </p>
+  </div>
+</div>
+
+<footer>Generated by WordPress Security Scanner</footer>
+</body>
+</html>

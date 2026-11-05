@@ -1,0 +1,1 @@
+"""Utility package for the WordPress Security Scanner."""
